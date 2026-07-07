@@ -19,6 +19,7 @@ A production-style, modular, and educational secure authentication system built 
 - [Database Schema](#database-schema)
 - [Limitations](#limitations)
 - [Future Improvements](#future-improvements)
+- [License](#license)
 
 ---
 
@@ -26,7 +27,7 @@ A production-style, modular, and educational secure authentication system built 
 
 This project demonstrates how to build a **complete, secure authentication system**. It is designed to be both a working application and an educational resource for understanding authentication security.
 
-Recently upgraded, the system now features a robust **SQLite backend** and a beautiful, modern **Flask-powered Web UI** using glassmorphism and vanilla HTML/CSS/JS.
+The system features a robust **SQLite backend** and a modern **Flask-powered Web UI** using glassmorphism and vanilla HTML/CSS/JS.
 
 Every security decision is documented in code comments explaining **what** it does and **why** it exists — which specific attack vector it defends against.
 
@@ -58,7 +59,7 @@ Every security decision is documented in code comments explaining **what** it do
 ## Architecture
 
 ```
-secure_auth_system/
+Secure-Login-System/
 │
 ├── main.py                  # Entry point — launches the Flask Web Server
 │
@@ -127,7 +128,7 @@ Each iteration feeds the previous output back as input, creating a computational
 
 ### Salting
 
-**What:** A salt is a cryptographically random value (32 bytes / 256 bits in this implementation) that is combined with the password before hashing. Each user gets a unique salt.
+**What:** A salt is a cryptographically random value (32 bytes / 256 bits) combined with the password before hashing. Each user gets a unique salt.
 
 **Why it matters — without salting:**
 ```
@@ -140,7 +141,7 @@ An attacker can build a "rainbow table" — a massive lookup table mapping commo
 hash("password123" + salt_alice)  = "a1b2c3d4..."    ← Unique to Alice
 hash("password123" + salt_bob)    = "e5f6g7h8..."    ← Unique to Bob
 ```
-Even though Alice and Bob chose the same password, their hashes are completely different. The attacker must brute-force each user separately, and rainbow tables become useless because every salt produces a different table.
+Even though Alice and Bob chose the same password, their hashes are completely different.
 
 **What it mitigates:** Rainbow table attacks, hash deduplication attacks
 
@@ -151,37 +152,28 @@ Even though Alice and Bob chose the same password, their hashes are completely d
 **The problem with `==`:**
 ```python
 # Python's == operator short-circuits:
-"abcdef" == "aXXXXX"  # Compares 'a'='a', then 'b'≠'X' → returns False (1 comparison)
-"abcdef" == "abcXXX"  # Compares 'a','b','c', then 'd'≠'X' → returns False (3 comparisons)
+"abcdef" == "aXXXXX"  # Stops at 2nd byte → fast response
+"abcdef" == "abcXXX"  # Stops at 4th byte → slightly slower response
 ```
+An attacker can measure response time to deduce how many leading bytes are correct, turning a 2²⁵⁶ problem into ~8,192 attempts.
 
-An attacker can measure the response time and deduce how many leading bytes are correct:
-- Fast response → first byte is wrong
-- Slightly slower → first byte correct, second is wrong
-- Even slower → first two bytes correct
-
-This turns a 2²⁵⁶ brute-force problem into a ~256 × 32 = 8,192 attempt problem.
-
-**The solution — `hmac.compare_digest()`:**
+**The solution:**
 ```python
-hmac.compare_digest(a, b)  # Always compares ALL bytes, regardless of mismatches
+hmac.compare_digest(a, b)  # Always compares ALL bytes — constant time
 ```
-
-Execution time is constant regardless of how many bytes match, eliminating the timing side-channel.
 
 **What it mitigates:** Timing attacks / side-channel attacks
 
 ### Account Lockout (Brute-Force Protection)
 
-**What:** After 3 consecutive failed login attempts, the account is locked for 30 seconds. During lockout, even the correct password is rejected.
+**What:** After 3 consecutive failed login attempts, the account is locked for 30 seconds.
 
 **Why:**
-- Without lockout, an attacker can try millions of passwords per second
-- With lockout, they get 3 attempts per 30 seconds = 6 attempts/minute
-- Brute-forcing a strong password at this rate would take thousands of years
+- Without lockout: attacker can try millions of passwords per second
+- With lockout: 3 attempts per 30 seconds = 6 attempts/minute
 
 **Implementation details:**
-- The lockout timestamp is persisted in the database, surviving server restarts
+- Lockout timestamp is persisted in the database, surviving server restarts
 - After the lockout period expires, the account automatically unlocks
 - Successful login resets the failure counter to zero
 - Admins can manually unlock accounts
@@ -193,9 +185,9 @@ Execution time is constant regardless of how many bytes match, eliminating the t
 **What:** After successful authentication, a session token is generated using `secrets.token_urlsafe(48)`, producing a 384-bit random value from the OS CSPRNG.
 
 **Why `secrets` and not `random` or `uuid4`:**
-- `random` uses a Mersenne Twister PRNG — deterministic and predictable if the seed is known
-- `uuid4` may use less entropy and is not guaranteed to be cryptographically secure on all platforms
-- `secrets` is explicitly designed for security tokens and uses the OS's strongest available CSPRNG
+- `random` uses a Mersenne Twister PRNG — deterministic and predictable
+- `uuid4` is not guaranteed to be cryptographically secure on all platforms
+- `secrets` uses the OS's strongest available CSPRNG
 
 **Token lifecycle:**
 1. **Created** on successful login
@@ -212,22 +204,21 @@ Execution time is constant regardless of how many bytes match, eliminating the t
 ### Prerequisites
 
 - **Python 3.7+**
-- **Flask** `pip install flask`
+- **Flask** — `pip install flask`
 
 ### Launch the Web App
 
 ```bash
-# From the project root (Secure Login System/)
-python secure_auth_system/main.py
+# From the project root
+python main.py
 ```
 
-Then, navigate to `http://localhost:5000` in your web browser.
+Then navigate to `http://localhost:5000` in your browser.
 
 ### Automated Demo / Tests
 
 ```bash
-# Runs all core logic test scenarios automatically
-python -m secure_auth_system.demo.test_flow
+python -m demo.test_flow
 ```
 
 ---
@@ -250,7 +241,7 @@ User records are stored in `data/users.db` via SQLite.
 | `security_question` | TEXT | Password recovery question |
 | `security_answer_hash` | TEXT | PBKDF2 hash of the answer |
 
-> ⚠️ **Note:** `salt`, `password_hash`, and `security_answer_hash` are the only cryptographic fields. No plaintext passwords or answers are ever stored.
+> ⚠️ **Note:** No plaintext passwords or answers are ever stored.
 
 ---
 
@@ -258,30 +249,30 @@ User records are stored in `data/users.db` via SQLite.
 
 | Limitation | Explanation |
 |---|---|
-| **No TLS/HTTPS** | A production web deployment would require TLS to protect credentials in transit. |
-| **PBKDF2 vs Argon2** | PBKDF2 is well-established but Argon2 (the Password Hashing Competition winner) provides better resistance to GPU/ASIC attacks via memory-hardness. |
-| **No rate limiting at network level** | The lockout mechanism is application-level only. In production, use IP-based rate limiting (e.g., nginx, WAF). |
-| **Security questions** | Generally considered weaker than TOTP/MFA. Used here for educational purposes. |
-| **No password complexity rules** | Only minimum length is enforced. Production systems should check against breached-password databases. |
+| **No TLS/HTTPS** | A production deployment would require TLS to protect credentials in transit |
+| **PBKDF2 vs Argon2** | Argon2 provides better resistance to GPU/ASIC attacks via memory-hardness |
+| **No network-level rate limiting** | Lockout is application-level only; production systems should add IP-based rate limiting |
+| **Security questions** | Generally weaker than TOTP/MFA — used here for educational purposes |
+| **No password complexity rules** | Only minimum length is enforced |
 
 ---
 
 ## Future Improvements
 
 - 🔑 **Multi-Factor Authentication (MFA):** TOTP-based 2FA using `hmac` and `time`
-- 🔒 **Argon2 hashing:** Memory-hard KDF for GPU-attack resistance (requires `argon2-cffi`)
+- 🔒 **Argon2 hashing:** Memory-hard KDF for GPU-attack resistance
 - 📝 **Audit logging:** Record all login attempts, password changes, admin actions
 - 🔄 **Password rotation policy:** Force periodic password changes
-- 🛡️ **Breached-password check:** Verify passwords against Have I Been Pwned (k-anonymity API)
+- 🛡️ **Breached-password check:** Verify against Have I Been Pwned (k-anonymity API)
 - ⏰ **Configurable lockout policy:** Admin-adjustable thresholds and durations
-- 🧪 **Unit test suite:** `unittest` or `pytest` based comprehensive test coverage
+- 🧪 **Unit test suite:** `pytest`-based comprehensive test coverage
 
 ---
 
 ## License
 
-This project is provided for **educational purposes**. Use the security patterns demonstrated here as a foundation, but always rely on battle-tested libraries (Argon2, bcrypt) and frameworks for production deployments.
+This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
 
 ---
 
-*Built with ❤️.*
+*Built with ❤️ by [Nour Yehia](https://github.com/Naruto109k)*
